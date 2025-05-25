@@ -31,7 +31,11 @@ def handle_message(event):
 
     conn = sqlite3.connect('jobNs.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT name, company_name, salary, job_url FROM jobs WHERE name LIKE ?", (f'%{user_msg}%',))
+    cursor.execute("""
+    SELECT name, company_name, salary, job_url 
+    FROM jobs 
+    WHERE name LIKE ? OR company_addr LIKE ?
+    """, (f'%{user_msg}%', f'%{user_msg}%'))
     results = cursor.fetchall()
     conn.close()
 
