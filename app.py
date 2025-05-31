@@ -216,15 +216,9 @@ def refresh_jobs():
     """
 
 if __name__ == '__main__':
-    # 本地開發模式
-    setup_rich_menu()
+    initialize_rich_menu()
     app.run(debug=True, port=5000)
 else:
-    # Render 部署模式
-    # 改用應用上下文和手動初始化
+    # 在 Gunicorn 下運行時，使用應用上下文初始化
     with app.app_context():
-        try:
-            setup_rich_menu()
-        except Exception as e:
-            print(f"Rich Menu 初始化失敗: {str(e)}")
-            # 可以選擇記錄日誌或忽略錯誤繼續運行
+        initialize_rich_menu()
