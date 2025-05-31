@@ -2,7 +2,7 @@ from flask import Flask, render_template, request,abort
 from job104_spider import Job104Spider
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import RichMenu, RichMenuArea, RichMenuBounds, RichMenuSize, MessageAction
+from linebot.models import RichMenu, RichMenuArea, RichMenuBounds, RichMenuSize, MessageAction,MessageEvent,TextMessage
 import sqlite3
 import os
 
