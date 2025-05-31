@@ -74,47 +74,41 @@ class PaginationHelper:
         if end - start + 1 < display_pages:
             start = max(1, end - display_pages + 1)
         return range(start, end + 1)
-def setup_rich_menu():
+def initialize_rich_menu():
+    """安全的 Rich Menu 初始化函數"""
     try:
-        # 先檢查是否已存在相同名稱的 Rich Menu
-        menus = line_bot_api.get_rich_menu_list()
-        for menu in menus:
+        # 檢查是否已有同名 Rich Menu
+        existing_menus = line_bot_api.get_rich_menu_list()
+        for menu in existing_menus:
             if menu.name == "Job Search Menu":
                 line_bot_api.delete_rich_menu(menu.rich_menu_id)
         
-        # 創建新的 Rich Menu
+        # 創建新 Rich Menu
         image_path = os.path.join(app.root_path, 'static', 'job.png')
         if not os.path.exists(image_path):
-            raise FileNotFoundError(f"圖片不存在: {image_path}")
-        rich_menu = RichMenu(
-            size=RichMenuSize(width=2500, height=843),
-            selected=False,
-            name="Job Search Menu",
-            chat_bar_text="點我查職缺",
-            areas= [
-            {  # 職缺查詢按鈕
-                "bounds": {"x": 0, "y": 0, "width": 833, "height": 843},
-                "action": {"type": "message", "text": "#職缺查詢"}
-            },
-            {  # 地區查詢按鈕
-                "bounds": {"x": 833, "y": 0, "width": 833, "height": 843},
-                "action": {"type": "message", "text": "#地區查詢"}
-            },
-            {  # 薪水查詢按鈕
-                "bounds": {"x": 1666, "y": 0, "width": 834, "height": 843},
-                "action": {"type": "message", "text": "#薪水查詢"}
-            }
+            print(f"警告: Rich Menu 圖片不存在於 {image_path}")
+            return False
+            
+        rich_menu = {
+            "size": {"width": 2500, "height": 843},
+            "selected": False,
+            "name": "Job Search Menu",
+            "chatBarText": "點我查職缺",
+            "areas": [
+                {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "#職缺查詢"}},
+                {"bounds": {"x": 833, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "#地區查詢"}},
+                {"bounds": {"x": 1666, "y": 0, "width": 834, "height": 843}, "action": {"type": "message", "text": "#薪水查詢"}}
             ]
-        )
-    
-    # 上傳 Rich Menu 圖片並設定
+        }
+        
         rich_menu_id = line_bot_api.create_rich_menu(rich_menu=rich_menu)
         with open(image_path, "rb") as f:
             line_bot_api.set_rich_menu_image(rich_menu_id, "image/png", f)
         line_bot_api.set_default_rich_menu(rich_menu_id)
-        
+        return True
     except Exception as e:
-        print(f"Rich Menu 設定失敗: {str(e)}")
+        print(f"Rich Menu 初始化錯誤: {str(e)}")
+        return False
 def normalize_area(area):
     """統一地區名稱格式"""
     area = area.replace('臺', '台').strip()
@@ -222,11 +216,15 @@ def refresh_jobs():
     """
 
 if __name__ == '__main__':
-    # 本地開發
+    # 本地開發模式
     setup_rich_menu()
     app.run(debug=True, port=5000)
 else:
-    # Render 部署
-    @app.before_first_request
-    def initialize():
-        setup_rich_menu()
+    # Render 部署模式
+    # 改用應用上下文和手動初始化
+    with app.app_context():
+        try:
+            setup_rich_menu()
+        except Exception as e:
+            print(f"Rich Menu 初始化失敗: {str(e)}")
+            # 可以選擇記錄日誌或忽略錯誤繼續運行
