@@ -44,15 +44,15 @@ def handle_message(event):
     elif "~" in user_msg:
         try:
             salary_min, salary_max = user_msg.split("~")
-            keyword1 = f'%{salary_min.strip()}%'
-            keyword2 = f'%{salary_max.strip()}%'
+            salary_min = int(salary_min.strip())
+            salary_max = int(salary_max.strip())
 
             cursor.execute("""
                 SELECT name, company_name, salary, job_url 
                 FROM jobs 
-                WHERE salary LIKE ? OR salary LIKE ?
+                WHERE salary_low <= ? AND salary_high >= ?
                 LIMIT 5
-            """, (keyword1, keyword2))
+            """, (salary_max, salary_min))  # 注意順序！
 
             results = cursor.fetchall()
             if results:
@@ -61,9 +61,10 @@ def handle_message(event):
                     for name, company, salary, url in results
                 ])
             else:
-                reply = "找不到符合該薪資範圍的職缺，請確認格式為 30000~50000 或包含實際薪資文字。"
+                reply = "找不到符合該薪資範圍的職缺，請確認格式為 30000~50000。"
         except Exception as e:
             reply = f"處理薪資範圍查詢時發生錯誤：{e}"
+
 
     else:
         cursor.execute("""
