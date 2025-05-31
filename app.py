@@ -2,7 +2,7 @@ from flask import Flask, render_template, request,abort
 from job104_spider import Job104Spider
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import RichMenu, RichMenuArea, RichMenuBounds, RichMenuSize, MessageAction
 import sqlite3
 import os
 
@@ -74,38 +74,52 @@ class PaginationHelper:
         if end - start + 1 < display_pages:
             start = max(1, end - display_pages + 1)
         return range(start, end + 1)
-def initialize_rich_menu():
-    """安全的 Rich Menu 初始化函數"""
+def setup_rich_menu():
     try:
-        # 檢查是否已有同名 Rich Menu
-        existing_menus = line_bot_api.get_rich_menu_list()
-        for menu in existing_menus:
+        # 使用正確的 RichMenu 類別
+        rich_menu = RichMenu(
+            size=RichMenuSize(width=2500, height=843),  # 必須使用 RichMenuSize
+            selected=False,
+            name="Job Search Menu",
+            chat_bar_text="點我查職缺",
+            areas=[
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=0, y=0, width=833, height=843),  # 必須使用 RichMenuBounds
+                    action=MessageAction(label="職缺查詢", text="#職缺查詢")  # 必須使用 MessageAction
+                ),
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=833, y=0, width=833, height=843),
+                    action=MessageAction(label="地區查詢", text="#地區查詢")
+                ),
+                RichMenuArea(
+                    bounds=RichMenuBounds(x=1666, y=0, width=834, height=843),
+                    action=MessageAction(label="薪水查詢", text="#薪水查詢")
+                )
+            ]
+        )
+        
+        # 刪除現有的同名 Rich Menu
+        menus = line_bot_api.get_rich_menu_list()
+        for menu in menus:
             if menu.name == "Job Search Menu":
                 line_bot_api.delete_rich_menu(menu.rich_menu_id)
         
-        # 創建新 Rich Menu
+        # 創建並上傳 Rich Menu
+        rich_menu_id = line_bot_api.create_rich_menu(rich_menu=rich_menu)
+        
+        # 上傳圖片
         image_path = os.path.join(app.root_path, 'static', 'job.png')
         if not os.path.exists(image_path):
             print(f"警告: Rich Menu 圖片不存在於 {image_path}")
             return False
             
-        rich_menu = {
-            "size": {"width": 2500, "height": 843},
-            "selected": False,
-            "name": "Job Search Menu",
-            "chatBarText": "點我查職缺",
-            "areas": [
-                {"bounds": {"x": 0, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "#職缺查詢"}},
-                {"bounds": {"x": 833, "y": 0, "width": 833, "height": 843}, "action": {"type": "message", "text": "#地區查詢"}},
-                {"bounds": {"x": 1666, "y": 0, "width": 834, "height": 843}, "action": {"type": "message", "text": "#薪水查詢"}}
-            ]
-        }
-        
-        rich_menu_id = line_bot_api.create_rich_menu(rich_menu=rich_menu)
         with open(image_path, "rb") as f:
             line_bot_api.set_rich_menu_image(rich_menu_id, "image/png", f)
+        
+        # 設為預設選單
         line_bot_api.set_default_rich_menu(rich_menu_id)
         return True
+        
     except Exception as e:
         print(f"Rich Menu 初始化錯誤: {str(e)}")
         return False
@@ -215,10 +229,13 @@ def refresh_jobs():
     </html>
     """
 
+# 在應用啟動時初始化
 if __name__ == '__main__':
-    initialize_rich_menu()
+    # 本地開發模式
+    setup_rich_menu()
     app.run(debug=True, port=5000)
 else:
-    # 在 Gunicorn 下運行時，使用應用上下文初始化
+    # 生產環境模式 (Render)
+    # 改用應用上下文初始化
     with app.app_context():
-        initialize_rich_menu()
+        setup_rich_menu()
