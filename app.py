@@ -34,13 +34,37 @@ def handle_message(event):
     
     if user_msg == "#職缺查詢":
         reply = "請輸入職缺關鍵字（例如：工程師、行銷）："
-    
+
     elif user_msg == "#地區查詢":
         reply = "請輸入地區（例如：台北、台中）："
-    
+
     elif user_msg == "#薪水查詢":
         reply = "請輸入薪資範圍（例如：30000~50000）："
-    
+
+    elif "~" in user_msg:
+        try:
+            salary_min, salary_max = user_msg.split("~")
+            keyword1 = f'%{salary_min.strip()}%'
+            keyword2 = f'%{salary_max.strip()}%'
+
+            cursor.execute("""
+                SELECT name, company_name, salary, job_url 
+                FROM jobs 
+                WHERE salary LIKE ? OR salary LIKE ?
+                LIMIT 5
+            """, (keyword1, keyword2))
+
+            results = cursor.fetchall()
+            if results:
+                reply = "\n\n".join([
+                    f"{name}\n公司：{company}\n薪資：{salary}\n🔗 {url}"
+                    for name, company, salary, url in results
+                ])
+            else:
+                reply = "找不到符合該薪資範圍的職缺，請確認格式為 30000~50000 或包含實際薪資文字。"
+        except Exception as e:
+            reply = f"處理薪資範圍查詢時發生錯誤：{e}"
+
     else:
         cursor.execute("""
             SELECT name, company_name, salary, job_url 
@@ -57,12 +81,13 @@ def handle_message(event):
             ])
         else:
             reply = "找不到相關職缺，請換個關鍵字試試！"
-    
+
     conn.close()
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply)
     )
+
 
 class PaginationHelper:
     @staticmethod
