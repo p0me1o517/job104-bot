@@ -22,20 +22,40 @@ app = Flask(__name__, template_folder='templates')
 line_bot_api = LineBotApi(os.getenv('LINE_CHANNEL_ACCESS_TOKEN', 'klVqD2n+y6hl//EHFaIrC+/JTGfBJC9MdWuBnsDT4Y8/p6YKIJDABn2RkiiljY2+LTk1E7p2sd5ardMaqEzEcbrkbE+aBxZJKTjch+D9k+YZcwk5GLSixDQGXhKoVpr+wfnCYQ05XkwbjfMv6cDs4wdB04t89/1O/w1cDnyilFU='))
 handler = WebhookHandler(os.getenv('LINE_CHANNEL_SECRET', '69154eb08d78b91e1d28aa1eb60f17a4'))
 
-# 建立快速回覆按鈕
-def create_quick_reply():
+# 建立主選單快速回覆按鈕
+def create_main_menu():
     return QuickReply(items=[
         QuickReplyButton(
-            action=MessageAction(label="台北", text="地區:台北")
+            action=MessageAction(label="🔍 搜尋職缺", text="show_search_options")
         ),
         QuickReplyButton(
-            action=MessageAction(label="台中", text="地區:台中")
+            action=MessageAction(label="⭐ 我的收藏", text="show_favorites")
         ),
         QuickReplyButton(
-            action=MessageAction(label="高薪", text="薪資:50000")
+            action=URIAction(label="🌐 網站版", uri="https://your-website.com")
         ),
         QuickReplyButton(
-            action=MessageAction(label="說明", text="幫助")
+            action=MessageAction(label="ℹ️ 使用說明", text="show_help")
+        )
+    ])
+
+# 建立搜尋選項按鈕
+def create_search_options():
+    return QuickReply(items=[
+        QuickReplyButton(
+            action=MessageAction(label="🏙️ 台北職缺", text="search:台北")
+        ),
+        QuickReplyButton(
+            action=MessageAction(label="🏙️ 台中職缺", text="search:台中")
+        ),
+        QuickReplyButton(
+            action=MessageAction(label="💰 高薪職缺", text="search:高薪")
+        ),
+        QuickReplyButton(
+            action=MessageAction(label="🆕 最新職缺", text="search:最新")
+        ),
+        QuickReplyButton(
+            action=MessageAction(label="🔙 返回主選單", text="main_menu")
         )
     ])
 
@@ -56,110 +76,115 @@ def handle_message(event):
     user_msg = event.message.text.strip()
     user_id = event.source.user_id
 
-    # 幫助指令
-    if user_msg == "幫助":
-        help_text = """
-📢 使用說明：
-1. 直接輸入「職稱」搜尋
-  範例：工程師
-2. 進階搜尋格式：
-  「搜尋 [地區] [職稱] [薪資]」
-  範例：搜尋 台北 Python 50000
-3. 快速按鈕：
-  - 台北/台中：地區篩選
-  - 高薪：5萬以上職缺
-"""
+    # 主選單控制
+    if user_msg == "main_menu":
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text=help_text, quick_reply=create_quick_reply())
+            TextSendMessage(
+                text="請選擇功能：",
+                quick_reply=create_main_menu()
+            )
         )
         return
 
-    # 解析搜尋指令
-    search_params = {
-        'keyword': '',
-        'area': '',
-        'min_salary': None,
-        'max_salary': None
-    }
+    # 搜尋選單
+    if user_msg == "show_search_options":
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(
+                text="請選擇搜尋條件：",
+                quick_reply=create_search_options()
+            )
+        )
+        return
 
-    # 處理快速指令
-    if user_msg.startswith("地區:"):
-        search_params['area'] = user_msg.split(":")[1]
-    elif user_msg.startswith("薪資:"):
-        search_params['min_salary'] = int(user_msg.split(":")[1])
-    elif user_msg.startswith("搜尋"):
-        parts = user_msg.split()
-        if len(parts) >= 2:
-            for part in parts[1:]:
-                if part.replace(',', '').isdigit():
-                    if not search_params['min_salary']:
-                        search_params['min_salary'] = int(part.replace(',', ''))
-                    else:
-                        search_params['max_salary'] = int(part.replace(',', ''))
-                elif part in ["台北", "台中", "高雄"]:
-                    search_params['area'] = part
-                else:
-                    search_params['keyword'] += part + ' '
-            search_params['keyword'] = search_params['keyword'].strip()
-    else:
-        search_params['keyword'] = user_msg
+    # 使用說明
+    if user_msg == "show_help":
+        help_text = """
+🤖 使用說明：
+完全不用打字！只需：
+1. 點擊「🔍 搜尋職缺」
+2. 選擇篩選條件
+3. 查看系統推薦職缺
 
-    # 執行資料庫查詢
-    conn = sqlite3.connect('jobNs.db')
-    cursor = conn.cursor()
-    
-    query = """
-    SELECT name, company_name, salary, job_url, company_addr 
-    FROM jobs 
-    WHERE 1=1
-    """
-    params = []
+📌 按鈕功能：
+🏙️ 地區篩選 - 台北/台中
+💰 高薪職缺 - 月薪5萬+
+🆕 最新職缺 - 24小時內更新
+"""
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(
+                text=help_text,
+                quick_reply=create_main_menu()
+            )
+        )
+        return
 
-    if search_params['keyword']:
-        query += " AND (name LIKE ? OR company_name LIKE ?)"
-        params.extend([f'%{search_params["keyword"]}%', f'%{search_params["keyword"]}%'])
-    
-    if search_params['area']:
-        normalized_area = search_params['area'].replace('臺', '台').strip()
-        if normalized_area.endswith(('市', '縣')):
-            normalized_area = normalized_area[:-1]
-        query += " AND (company_addr LIKE ? OR company_addr LIKE ?)"
-        params.extend([f'%{normalized_area}%', f'%{normalized_area}市%'])
-    
-    if search_params['min_salary']:
-        query += " AND salary_high >= ?"
-        params.append(search_params['min_salary'])
-    
-    if search_params['max_salary']:
-        query += " AND salary_low <= ?"
-        params.append(search_params['max_salary'])
+    # 搜尋功能
+    if user_msg.startswith("search:"):
+        search_type = user_msg.split(":")[1]
+        
+        conn = sqlite3.connect('jobNs.db')
+        cursor = conn.cursor()
+        
+        if search_type == "高薪":
+            cursor.execute("""
+            SELECT name, company_name, salary, job_url 
+            FROM jobs 
+            WHERE salary_high >= 50000
+            ORDER BY salary_high DESC 
+            LIMIT 5
+            """)
+        elif search_type == "最新":
+            cursor.execute("""
+            SELECT name, company_name, salary, job_url 
+            FROM jobs 
+            ORDER BY appear_date DESC 
+            LIMIT 5
+            """)
+        else:  # 地區搜尋
+            cursor.execute("""
+            SELECT name, company_name, salary, job_url 
+            FROM jobs 
+            WHERE company_addr LIKE ? 
+            ORDER BY appear_date DESC 
+            LIMIT 5
+            """, (f'%{search_type}%',))
+        
+        results = cursor.fetchall()
+        conn.close()
 
-    query += " ORDER BY appear_date DESC LIMIT 5"
-    
-    cursor.execute(query, params)
-    results = cursor.fetchall()
-    conn.close()
+        if results:
+            reply = f"【{search_type}推薦職缺】\n\n" + "\n\n".join([
+                f"🏢 {name}\n"
+                f"🏭 公司：{company}\n"
+                f"💰 薪資：{salary}\n"
+                f"🔗 {url}"
+                for name, company, salary, url in results
+            ])
+        else:
+            reply = f"目前沒有{search_type}的職缺，請稍後再試"
 
-    # 組織回覆訊息
-    if results:
-        reply = "🔍 搜尋結果：\n\n" + "\n\n".join([
-            f"🏢 {name}\n"
-            f"🏭 公司：{company}\n"
-            f"💰 薪資：{salary}\n"
-            f"📍 地點：{addr.split()[0]}\n"
-            f"🔗 {url}"
-            for name, company, salary, url, addr in results
-        ])
-    else:
-        reply = "找不到符合條件的職缺，請嘗試其他關鍵字或調整條件"
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(
+                text=reply + "\n\n請選擇下一步操作：",
+                quick_reply=create_search_options()
+            )
+        )
+        return
 
-    # 回覆時附加快速按鈕
+    # 初始歡迎訊息
+    welcome_msg = """
+🎉 歡迎使用職缺搜尋機器人！
+完全不用打字，只需點擊下方按鈕即可開始
+"""
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(
-            text=reply + "\n\n💡 試試下方快速按鈕",
-            quick_reply=create_quick_reply()
+            text=welcome_msg,
+            quick_reply=create_main_menu()
         )
     )
 
