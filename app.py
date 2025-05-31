@@ -4,6 +4,7 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import sqlite3
+import os
 
 app = Flask(__name__, template_folder='templates')
 
@@ -74,6 +75,11 @@ class PaginationHelper:
             start = max(1, end - display_pages + 1)
         return range(start, end + 1)
 def setup_rich_menu():
+    # 動態取得圖片路徑（適應本地和 Render）
+    image_path = os.path.join(os.path.dirname(__file__), 'templates', 'job.png')
+    
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Rich Menu 圖片不存在於：{image_path}")
     rich_menu = {
         "size": {"width": 2500, "height": 843},
         "selected": False,
@@ -97,7 +103,7 @@ def setup_rich_menu():
     
     # 上傳 Rich Menu 圖片並設定
     rich_menu_id = line_bot_api.create_rich_menu(rich_menu=rich_menu)
-    with open("job.png", "rb") as f:  # 替換為你的圖片路徑
+    with open(image_path, "rb") as f:
         line_bot_api.set_rich_menu_image(rich_menu_id, "image/png", f)
     line_bot_api.set_default_rich_menu(rich_menu_id)
 def normalize_area(area):
@@ -207,5 +213,8 @@ def refresh_jobs():
     """
 
 if __name__ == '__main__':
-    setup_rich_menu()
     app.run(debug=True, port=5000)
+else:
+    # 適用於 Render 等雲端環境
+    with app.app_context():
+        setup_rich_menu()
