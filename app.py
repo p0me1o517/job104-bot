@@ -41,14 +41,28 @@ def handle_message(event):
     elif user_msg == "#薪水查詢":
         reply = "請輸入薪資範圍（例如：30000~50000）："
     
-    else:
-        # 根據用戶輸入的關鍵字進行查詢（原有邏輯）
-        cursor.execute("""
-            SELECT name, company_name, salary, job_url 
-            FROM jobs 
-            WHERE name LIKE ? OR company_addr LIKE ? OR salary LIKE ?
-            LIMIT 5
-        """, (f'%{user_msg}%', f'%{user_msg}%', f'%{user_msg}%'))
+        else:
+        # 檢查是否是薪資範圍輸入
+        import re
+        salary_range = re.match(r"(\d+)\s*~\s*(\d+)", user_msg)
+        if salary_range:
+            low, high = map(int, salary_range.groups())
+            cursor.execute("""
+                SELECT name, company_name, salary, job_url 
+                FROM jobs 
+                WHERE CAST(REPLACE(REPLACE(salary, ',', ''), '元', '') AS INTEGER) >= ? 
+                  AND CAST(REPLACE(REPLACE(salary, ',', ''), '元', '') AS INTEGER) <= ?
+                LIMIT 5
+            """, (low, high))
+        else:
+            # 一般關鍵字模糊查詢
+            cursor.execute("""
+                SELECT name, company_name, salary, job_url 
+                FROM jobs 
+                WHERE name LIKE ? OR company_addr LIKE ? OR salary LIKE ?
+                LIMIT 5
+            """, (f'%{user_msg}%', f'%{user_msg}%', f'%{user_msg}%'))
+
         
         results = cursor.fetchall()
         if results:
