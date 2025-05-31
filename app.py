@@ -41,7 +41,7 @@ def handle_message(event):
     elif user_msg == "#薪水查詢":
         reply = "請輸入薪資範圍（例如：30000~50000）："
 
-    elif "~" or"~" in user_msg:
+    elif "~"  in user_msg:
         try:
             salary_min, salary_max = user_msg.split("~")
             salary_min = int(salary_min.strip())
