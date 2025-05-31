@@ -28,27 +28,37 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_msg = event.message.text.strip()
-
     conn = sqlite3.connect('jobNs.db')
     cursor = conn.cursor()
-    cursor.execute("""
-    SELECT name, company_name, salary, job_url 
-    FROM jobs 
-    WHERE name LIKE ? OR company_addr LIKE ?
-    """, (f'%{user_msg}%', f'%{user_msg}%'))
-
-
-    results = cursor.fetchall()
-    conn.close()
-
-    if results:
-        reply = '\n\n'.join([
-            f"{name}\n公司：{company}\n薪資：{salary}\n🔗 {url}"
-            for name, company, salary, url in results[:5]
-        ])
+    
+    if user_msg == "#職缺查詢":
+        reply = "請輸入職缺關鍵字（例如：工程師、行銷）："
+    
+    elif user_msg == "#地區查詢":
+        reply = "請輸入地區（例如：台北、台中）："
+    
+    elif user_msg == "#薪水查詢":
+        reply = "請輸入薪資範圍（例如：30000~50000）："
+    
     else:
-        reply = "找不到相關職缺，請換個關鍵字試試！"
-
+        # 根據用戶輸入的關鍵字進行查詢（原有邏輯）
+        cursor.execute("""
+            SELECT name, company_name, salary, job_url 
+            FROM jobs 
+            WHERE name LIKE ? OR company_addr LIKE ? OR salary LIKE ?
+            LIMIT 5
+        """, (f'%{user_msg}%', f'%{user_msg}%', f'%{user_msg}%'))
+        
+        results = cursor.fetchall()
+        if results:
+            reply = "\n\n".join([
+                f"{name}\n公司：{company}\n薪資：{salary}\n🔗 {url}"
+                for name, company, salary, url in results
+            ])
+        else:
+            reply = "找不到相關職缺，請換個關鍵字試試！"
+    
+    conn.close()
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply)
@@ -63,7 +73,33 @@ class PaginationHelper:
         if end - start + 1 < display_pages:
             start = max(1, end - display_pages + 1)
         return range(start, end + 1)
-
+def setup_rich_menu():
+    rich_menu = {
+        "size": {"width": 2500, "height": 843},
+        "selected": False,
+        "name": "Job Search Menu",
+        "chatBarText": "點我查職缺",
+        "areas": [
+            {  # 職缺查詢按鈕
+                "bounds": {"x": 0, "y": 0, "width": 833, "height": 843},
+                "action": {"type": "message", "text": "#職缺查詢"}
+            },
+            {  # 地區查詢按鈕
+                "bounds": {"x": 833, "y": 0, "width": 833, "height": 843},
+                "action": {"type": "message", "text": "#地區查詢"}
+            },
+            {  # 薪水查詢按鈕
+                "bounds": {"x": 1666, "y": 0, "width": 834, "height": 843},
+                "action": {"type": "message", "text": "#薪水查詢"}
+            }
+        ]
+    }
+    
+    # 上傳 Rich Menu 圖片並設定
+    rich_menu_id = line_bot_api.create_rich_menu(rich_menu=rich_menu)
+    with open("job.png", "rb") as f:  # 替換為你的圖片路徑
+        line_bot_api.set_rich_menu_image(rich_menu_id, "image/png", f)
+    line_bot_api.set_default_rich_menu(rich_menu_id)
 def normalize_area(area):
     """統一地區名稱格式"""
     area = area.replace('臺', '台').strip()
@@ -171,4 +207,5 @@ def refresh_jobs():
     """
 
 if __name__ == '__main__':
+    setup_rich_menu()
     app.run(debug=True, port=5000)
